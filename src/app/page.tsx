@@ -1,103 +1,201 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+type SubGoal = {
+  id: string;
+  title: string;
+  timeframe: string;
+  resourceLevel: string;
+  growthLevel: string;
+  completed: boolean;
+};
+type MidGoal = {
+  id: string;
+  title: string;
+  timeframe: string;
+  resourceLevel: string;
+  growthLevel: string;
+  subGoals: SubGoal[];
+};
+type Goal = { title: string; midGoals: MidGoal[] };
+
+export default function HomePage() {
+  const [inputGoal, setInputGoal] = useState("");
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const [language, setLanguage] = useState<
+    "zh-TW" | "zh-CN" | "en" | "ja" | "ko"
+  >("zh-TW");
+  const [mode, setMode] = useState<"" | "challenger" | "resource" | "growth">(
+    ""
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+
+  const handleGenerate = async () => {
+    if (!inputGoal.trim()) return;
+
+    setLoading(true);
+    setError("");
+    setSelectedGoal(null);
+
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal: inputGoal, language }),
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setSelectedGoal(data);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("無法連線到 AI");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSubGoal = (midGoalId: string, subGoalId: string) => {
+    if (!selectedGoal) return;
+    const updatedGoal: Goal = {
+      ...selectedGoal,
+      midGoals: selectedGoal.midGoals.map((mid) =>
+        mid.id === midGoalId
+          ? {
+              ...mid,
+              subGoals: mid.subGoals.map((sub) =>
+                sub.id === subGoalId
+                  ? { ...sub, completed: !sub.completed }
+                  : sub
+              ),
+            }
+          : mid
+      ),
+    };
+    setSelectedGoal(updatedGoal);
+  };
+
+  const handleStartChallenge = () => {
+    if (!mode) {
+      alert("請先選擇目標完成模式");
+      return;
+    }
+    if (!selectedGoal) {
+      alert("請先生成大目標");
+      return;
+    }
+
+    // 帶參數進入挑戰頁面
+    router.push(`/challenge/${mode}?goal=${encodeURIComponent(
+      JSON.stringify(selectedGoal)
+    )}`);
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen p-8 bg-[var(--background)] text-[var(--foreground)] font-sans">
+      <h1 className="text-4xl font-bold mb-6">AI 目標教練</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      {/* 語言選擇 */}
+      <div className="mb-4">
+        <label className="mr-2 font-semibold">選擇生成語言：</label>
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value as any)}
+          className="border p-2 rounded"
+        >
+          <option value="zh-TW">中文繁體</option>
+          <option value="zh-CN">中文簡體</option>
+          <option value="en">英文</option>
+          <option value="ja">日文</option>
+          <option value="ko">韓文</option>
+        </select>
+      </div>
+
+      {/* 輸入大目標 */}
+      <div className="mb-6 flex gap-2">
+        <input
+          type="text"
+          placeholder="輸入想完成的目標"
+          value={inputGoal}
+          onChange={(e) => setInputGoal(e.target.value)}
+          className="border p-2 flex-1 rounded"
+        />
+        <button
+          onClick={handleGenerate}
+          disabled={loading}
+          className="bg-blue-500 text-white px-4 rounded hover:bg-blue-600 disabled:opacity-50"
+        >
+          {loading ? "生成中..." : "告訴我"}
+        </button>
+      </div>
+
+      {/* 錯誤訊息 */}
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+
+      {/* 顯示 AI 拆解的目標 */}
+      {selectedGoal && (
+        <div className="border p-4 rounded shadow">
+          <h2 className="text-2xl font-bold mb-2">{selectedGoal.title}</h2>
+          {selectedGoal.midGoals.map((mid) => (
+            <div key={mid.id} className="mb-4 pl-4">
+              <h3 className="font-semibold">
+                {mid.title} ({mid.timeframe} | {mid.resourceLevel} |{" "}
+                {mid.growthLevel})
+              </h3>
+              <ul className="list-disc list-inside">
+                {mid.subGoals.map((sub) => (
+                  <li key={sub.id}>
+                    <label
+                      className={
+                        sub.completed ? "line-through text-gray-400" : ""
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sub.completed}
+                        onChange={() => toggleSubGoal(mid.id, sub.id)}
+                        className="mr-2"
+                      />
+                      {sub.title} ({sub.timeframe} | {sub.resourceLevel} |{" "}
+                      {sub.growthLevel})
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {/* 選擇模式 */}
+          <div className="mt-4">
+            <label className="mr-2 font-semibold">選擇目標完成模式：</label>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as any)}
+              className="border p-2 rounded"
+            >
+              <option value="">請選擇模式</option>
+              <option value="challenger">挑戰者模式</option>
+              <option value="resource">資源模式</option>
+              <option value="growth">成長模式</option>
+            </select>
+          </div>
+
+          {/* 開始挑戰 */}
+          <button
+            onClick={handleStartChallenge}
+            className="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            開始挑戰目標
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
     </div>
   );
 }
