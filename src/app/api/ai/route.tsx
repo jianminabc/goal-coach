@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(req: Request) {
   try {
     const { goal, language } = await req.json();
+
+    // 檢查 API Key
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OpenAI API Key is missing");
+    }
+
+    // 在 handler 內初始化 OpenAI 客戶端
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
     // 支援的語言指令
     const langMap: Record<string, string> = {
@@ -17,10 +23,9 @@ export async function POST(req: Request) {
       "ja": "日本語で答えてください",
       "ko": "한국어로 답변해주세요",
     };
-
-    // 預設為繁體中文
     const langInstruction = langMap[language] ?? langMap["zh-TW"];
 
+    // 呼叫 OpenAI Responses API
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
       input: `
@@ -71,7 +76,7 @@ ${langInstruction}
       `,
     });
 
-    // Responses API 提供 output_text
+    // 取得文字輸出
     let text = response.output_text ?? "{}";
 
     // 移除可能出現的 Markdown 區塊符號
