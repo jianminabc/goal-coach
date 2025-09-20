@@ -1,21 +1,35 @@
+// src/app/api/ai/test/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
+// CORS 設定
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*", // 可以限制來源，例如改成 "https://your-framer-site.com"
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// ✅ 支援 GET（瀏覽器直接打開）
+export async function GET() {
+  return NextResponse.json(
+    { message: "✅ API 正常運作，請使用 POST 送資料" },
+    { headers: corsHeaders }
+  );
+}
+
+// ✅ 支援 POST（AI Coach 功能）
 export async function POST(req: Request) {
   try {
     const { goal, language } = await req.json();
 
-    // 檢查 API Key
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OpenAI API Key is missing");
     }
 
-    // 在 handler 內初始化 OpenAI 客戶端
     const client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // 支援的語言指令
     const langMap: Record<string, string> = {
       "zh-TW": "請用繁體中文回答",
       "zh-CN": "请用简体中文回答",
@@ -25,7 +39,6 @@ export async function POST(req: Request) {
     };
     const langInstruction = langMap[language] ?? langMap["zh-TW"];
 
-    // 呼叫 OpenAI Responses API
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
       input: `
@@ -76,18 +89,21 @@ ${langInstruction}
       `,
     });
 
-    // 取得文字輸出
     let text = response.output_text ?? "{}";
-
-    // 移除可能出現的 Markdown 區塊符號
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-
-    // 嘗試解析 JSON
     const data = JSON.parse(text);
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: corsHeaders });
   } catch (error: any) {
     console.error("AI Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500, headers: corsHeaders }
+    );
   }
+}
+
+// ✅ 處理 OPTIONS (CORS 預檢請求)
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
 }
