@@ -1,4 +1,3 @@
-// src/app/api/ai/test.ts
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
