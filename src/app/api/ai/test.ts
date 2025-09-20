@@ -1,20 +1,17 @@
+// src/app/api/ai/test.ts
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function POST(req: Request) {
   try {
-    // 呼叫公開 API 測試
-    const res = await fetch("https://catfact.ninja/fact");
-    const data = await res.json();
+    const { goal, language } = await req.json();
 
     return NextResponse.json({
       success: true,
-      source: "catfact.ninja",
-      fact: data.fact,
+      goal,
+      language,
+      message: "測試 API 成功！",
     });
   } catch (error: any) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
