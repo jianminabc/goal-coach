@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Goal Coach Demo</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 80px; margin-bottom: 10px; }
+    button { padding: 10px 20px; cursor: pointer; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 5px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h3>輸入你的大目標</h3>
+  <textarea id="goalInput" placeholder="例如：學會彈吉他"></textarea>
+  <button onclick="callAPI()">開始規劃</button>
+
+  <h3>AI 回覆</h3>
+  <pre id="resultBox">（等待輸入與回覆）</pre>
+
+  <script>
+    async function callAPI() {
+      const goal = document.getElementById("goalInput").value;
+      if (!goal) {
+        alert("請輸入目標！");
+        return;
+      }
+
+      document.getElementById("resultBox").textContent = "⏳ AI 規劃中...";
+
+      try {
+        const res = await fetch("https://goal-coach.vercel.app/api/ai/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ goal, language: "zh-TW" })
+        });
+
+        if (!res.ok) throw new Error("API error " + res.status);
+
+        const data = await res.json();
+        document.getElementById("resultBox").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById("resultBox").textContent = "❌ API 呼叫失敗：" + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
